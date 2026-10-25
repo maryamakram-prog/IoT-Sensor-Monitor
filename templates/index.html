@@ -1,0 +1,869 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Sensor Monitor | Weather & Air Quality Tracker</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --navy: #172554;
+            --blue: #2563eb;
+            --blue-light: #eff6ff;
+            --background: #f4f7fc;
+            --white: #ffffff;
+            --text: #1e293b;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --green: #15803d;
+            --green-bg: #dcfce7;
+            --red: #b91c1c;
+            --red-bg: #fee2e2;
+            --orange: #c2410c;
+            --orange-bg: #ffedd5;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: var(--background);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        header {
+            background: var(--navy);
+            color: white;
+            padding: 30px 20px;
+        }
+
+        .header-content {
+            max-width: 1250px;
+            margin: auto;
+        }
+
+        header h1 {
+            margin: 0 0 5px;
+            font-size: 30px;
+        }
+
+        header p {
+            margin: 4px 0;
+            color: #dbeafe;
+        }
+
+        main {
+            max-width: 1250px;
+            margin: 25px auto;
+            padding: 0 18px 35px;
+        }
+
+        .section-heading {
+            color: var(--navy);
+            margin: 28px 0 14px;
+            font-size: 23px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
+        }
+
+        .card {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 13px;
+            padding: 20px;
+            margin-bottom: 18px;
+            box-shadow: 0 3px 12px rgba(15, 23, 42, 0.04);
+            min-width: 0;
+        }
+
+        .card h2 {
+            color: var(--navy);
+            font-size: 19px;
+            margin: 0 0 12px;
+        }
+
+        .card h3 {
+            color: var(--navy);
+            font-size: 17px;
+            margin: 0 0 10px;
+        }
+
+        .metric-label {
+            color: var(--muted);
+            font-size: 14px;
+            margin-bottom: 7px;
+        }
+
+        .metric-value {
+            color: var(--navy);
+            font-size: 30px;
+            font-weight: bold;
+            overflow-wrap: anywhere;
+        }
+
+        .metric-description {
+            color: var(--muted);
+            font-size: 13px;
+            margin-top: 5px;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-connected,
+        .status-active,
+        .status-resolved,
+        .status-closed,
+        .risk-low {
+            background: var(--green-bg);
+            color: var(--green);
+        }
+
+        .status-disconnected,
+        .status-inactive,
+        .risk-high {
+            background: var(--red-bg);
+            color: var(--red);
+        }
+
+        .status-open,
+        .risk-moderate,
+        .risk-unhealthy {
+            background: var(--orange-bg);
+            color: var(--orange);
+        }
+
+        .risk-box {
+            border-left: 5px solid var(--orange);
+        }
+
+        .risk-box.high {
+            border-left-color: var(--red);
+        }
+
+        .risk-box.low {
+            border-left-color: var(--green);
+        }
+
+        .risk-value {
+            font-size: 25px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 18px;
+        }
+
+        .sensor-detail {
+            margin: 5px 0;
+            overflow-wrap: anywhere;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 760px;
+        }
+
+        th, td {
+            padding: 12px 13px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        th {
+            background: var(--blue-light);
+            color: var(--navy);
+            font-weight: bold;
+        }
+
+        tbody tr:hover {
+            background: #f8fafc;
+        }
+
+        .alert-card {
+            border-left: 4px solid var(--orange);
+        }
+
+        .alert-card.high {
+            border-left-color: var(--red);
+        }
+
+        .alert-meta {
+            color: var(--muted);
+            font-size: 13px;
+            margin-top: 10px;
+        }
+
+        .notice {
+            background: var(--blue-light);
+            border: 1px solid #bfdbfe;
+            border-radius: 10px;
+            padding: 13px 16px;
+            color: #1e40af;
+            font-size: 14px;
+            margin: 18px 0;
+        }
+
+        .error-message {
+            background: var(--red-bg);
+            color: var(--red);
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .button-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        button {
+            background: var(--blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 11px 18px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        footer {
+            text-align: center;
+            color: var(--muted);
+            padding: 22px 15px;
+            border-top: 1px solid var(--border);
+            font-size: 13px;
+        }
+
+        .empty-message {
+            color: var(--muted);
+            padding: 18px 0;
+        }
+
+        @media (max-width: 600px) {
+            header h1 {
+                font-size: 25px;
+            }
+
+            main {
+                padding: 0 12px 25px;
+            }
+
+            .card {
+                padding: 16px;
+            }
+
+            .metric-value {
+                font-size: 26px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="header-content">
+            <h1>IoT Sensor Monitor</h1>
+            <p><strong>Weather & Air Quality Tracker</strong></p>
+            <p>Monitor registered sensors, readings, analytics, and pollution alerts.</p>
+        </div>
+    </header>
+
+    <main>
+        <div id="errorMessage" class="error-message"></div>
+
+        <h2 class="section-heading">System Overview</h2>
+
+        <div class="grid">
+            <section class="card">
+                <div class="metric-label">Backend Status</div>
+                <div>
+                    <span id="backendStatus" class="status status-disconnected">
+                        Connecting...
+                    </span>
+                </div>
+                <p id="databaseName" class="metric-description">
+                    Checking database connection...
+                </p>
+            </section>
+
+            <section class="card">
+                <div class="metric-label">Total Sensors</div>
+                <div id="totalSensors" class="metric-value">--</div>
+                <div class="metric-description">Registered sensors</div>
+            </section>
+
+            <section class="card">
+                <div class="metric-label">Total Readings</div>
+                <div id="totalReadings" class="metric-value">--</div>
+                <div class="metric-description">Stored sensor readings</div>
+            </section>
+
+            <section class="card">
+                <div class="metric-label">Total Alerts</div>
+                <div id="totalAlerts" class="metric-value">--</div>
+                <div class="metric-description">Stored system alerts</div>
+            </section>
+        </div>
+
+        <h2 class="section-heading">Sensor Analytics</h2>
+
+        <div class="grid">
+            <section class="card">
+                <div class="metric-label">Average Temperature</div>
+                <div id="averageTemperature" class="metric-value">--</div>
+                <div class="metric-description">Degrees Celsius</div>
+            </section>
+
+            <section class="card">
+                <div class="metric-label">Average Humidity</div>
+                <div id="averageHumidity" class="metric-value">--</div>
+                <div class="metric-description">Relative humidity</div>
+            </section>
+
+            <section class="card">
+                <div class="metric-label">Average AQI</div>
+                <div id="averageAQI" class="metric-value">--</div>
+                <div class="metric-description">Air Quality Index</div>
+            </section>
+        </div>
+
+        <p id="analyticsNote" class="muted">
+            Analytics will appear after data is loaded.
+        </p>
+
+        <h2 class="section-heading">AQI Pollution Risk Indicator</h2>
+
+        <section id="riskCard" class="card risk-box">
+            <div id="aqiCategory" class="risk-value">Checking...</div>
+            <p>Risk level: <strong id="aqiRisk">--</strong></p>
+            <p id="aqiMessage">Waiting for air quality data.</p>
+            <p>
+                Latest available non-zero AQI:
+                <strong id="latestAQI">--</strong>
+            </p>
+            <p class="muted">
+                AQI categories use the US EPA AQI scale. This indicator is based
+                on stored data and is not a live environmental warning.
+            </p>
+        </section>
+
+        <h2 class="section-heading">Registered Sensors</h2>
+        <div id="sensorsContainer" class="sensor-grid">
+            <section class="card">Loading registered sensors...</section>
+        </div>
+
+        <h2 class="section-heading">Latest Sensor Readings</h2>
+        <div id="latestReadingsContainer" class="sensor-grid">
+            <section class="card">Loading latest readings...</section>
+        </div>
+
+        <h2 class="section-heading">Historical Sensor Readings</h2>
+
+        <section class="card">
+            <h2>Reading History</h2>
+            <p class="muted">
+                Historical readings retrieved from MongoDB Atlas through the Flask API.
+            </p>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sensor ID</th>
+                            <th>Temperature (°C)</th>
+                            <th>Humidity (%)</th>
+                            <th>PM2.5</th>
+                            <th>PM10</th>
+                            <th>AQI</th>
+                            <th>Recorded At</th>
+                            <th>Source</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyRows">
+                        <tr>
+                            <td colspan="8">Loading historical readings...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <h2 class="section-heading">Pollution & System Alerts</h2>
+        <div id="alertsContainer">
+            <section class="card">Loading alerts...</section>
+        </div>
+
+        <div class="notice">
+            <strong>Demo data notice:</strong>
+            The readings currently stored in this project are sample demo values,
+            not live sensor measurements. Do not use them as real environmental
+            or medical warnings.
+        </div>
+
+        <div class="button-row">
+            <button id="refreshButton" type="button" onclick="loadDashboard()">
+                Refresh Dashboard
+            </button>
+            <span id="lastRefreshed" class="muted">
+                Last refreshed: Not yet
+            </span>
+        </div>
+    </main>
+
+    <footer>
+        IoT Sensor Monitor | Weather & Air Quality Tracker
+    </footer>
+
+    <script>
+        const API = {
+            health: "/api/health",
+            sensors: "/api/sensors",
+            readings: "/api/readings",
+            alerts: "/api/alerts",
+            analytics: "/api/analytics"
+        };
+
+        async function fetchJSON(url) {
+            const response = await fetch(url, {
+                headers: { "Accept": "application/json" }
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    "Request failed for " + url + " (HTTP " + response.status + ")"
+                );
+            }
+
+            return await response.json();
+        }
+
+        function getArray(data, possibleKeys) {
+            if (Array.isArray(data)) {
+                return data;
+            }
+
+            for (const key of possibleKeys) {
+                if (data && Array.isArray(data[key])) {
+                    return data[key];
+                }
+            }
+
+            return [];
+        }
+
+        function getValue(object, keys, fallback = "--") {
+            for (const key of keys) {
+                if (
+                    object &&
+                    object[key] !== undefined &&
+                    object[key] !== null
+                ) {
+                    return object[key];
+                }
+            }
+
+            return fallback;
+        }
+
+        function escapeHTML(value) {
+            return String(value ?? "")
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        function formatNumber(value, decimals = 1) {
+            const number = Number(value);
+
+            if (!Number.isFinite(number)) {
+                return "--";
+            }
+
+            return Number.isInteger(number)
+                ? String(number)
+                : number.toFixed(decimals);
+        }
+
+        function formatDate(value) {
+            if (!value || value === "--") {
+                return "--";
+            }
+
+            let date;
+
+            if (typeof value === "object" && value.$date) {
+                date = new Date(value.$date);
+            } else {
+                date = new Date(value);
+            }
+
+            if (Number.isNaN(date.getTime())) {
+                return escapeHTML(value);
+            }
+
+            return date.toLocaleString();
+        }
+
+        function displayValue(value, suffix = "") {
+            if (value === null || value === undefined || value === "--") {
+                return "--";
+            }
+
+            return escapeHTML(value) + suffix;
+        }
+
+        function setError(message) {
+            const box = document.getElementById("errorMessage");
+            box.textContent = message;
+            box.style.display = "block";
+        }
+
+        function clearError() {
+            const box = document.getElementById("errorMessage");
+            box.textContent = "";
+            box.style.display = "none";
+        }
+
+        async function loadHealth() {
+            const statusElement = document.getElementById("backendStatus");
+            const databaseElement = document.getElementById("databaseName");
+
+            try {
+                const data = await fetchJSON(API.health);
+
+                const connected =
+                    data.connected === true ||
+                    data.status === "connected" ||
+                    data.status === "ok" ||
+                    data.success === true;
+
+                statusElement.textContent = connected ? "Connected" : "Available";
+                statusElement.className = "status status-connected";
+
+                databaseElement.textContent = getValue(
+                    data,
+                    ["database", "database_name", "db_name"],
+                    "IoTSensorMonitor"
+                );
+            } catch (error) {
+                statusElement.textContent = "Connection Error";
+                statusElement.className = "status status-disconnected";
+                databaseElement.textContent = "Unable to check backend status.";
+                throw error;
+            }
+        }
+
+        async function loadSensors() {
+            const data = await fetchJSON(API.sensors);
+            const sensors = getArray(data, ["sensors", "data", "results"]);
+
+            document.getElementById("totalSensors").textContent = sensors.length;
+
+            const container = document.getElementById("sensorsContainer");
+
+            if (sensors.length === 0) {
+                container.innerHTML =
+                    '<section class="card empty-message">No registered sensors found.</section>';
+                return;
+            }
+
+            container.innerHTML = sensors.map(sensor => {
+                const id = getValue(sensor, ["sensor_id", "id", "_id"]);
+                const name = getValue(
+                    sensor,
+                    ["name", "sensor_name", "sensor_type", "type"],
+                    "Unnamed Sensor"
+                );
+                const type = getValue(sensor, ["type", "sensor_type"], "Unknown");
+                const status = getValue(sensor, ["status"], "unknown");
+                const active = String(status).toLowerCase() === "active";
+
+                return `
+                    <section class="card">
+                        <h3>${escapeHTML(name)}</h3>
+                        <p class="sensor-detail">
+                            <strong>ID:</strong> ${escapeHTML(id)}
+                        </p>
+                        <p class="sensor-detail">
+                            <strong>Type:</strong> ${escapeHTML(type)}
+                        </p>
+                        <p class="sensor-detail">
+                            <strong>Status:</strong>
+                            <span class="status ${active ? "status-active" : "status-disconnected"}">
+                                ${escapeHTML(status)}
+                            </span>
+                        </p>
+                    </section>
+                `;
+            }).join("");
+        }
+
+        function renderLatestReadings(readings) {
+            const container = document.getElementById("latestReadingsContainer");
+
+            if (!readings.length) {
+                container.innerHTML =
+                    '<section class="card empty-message">No sensor readings found.</section>';
+                return;
+            }
+
+            container.innerHTML = readings.slice(0, 6).map(reading => {
+                const sensorId = getValue(reading, ["sensor_id"], "Unknown");
+                const temperature = getValue(reading, ["temperature_c"]);
+                const humidity = getValue(reading, ["humidity_percent"]);
+                const pm25 = getValue(reading, ["pm25"]);
+                const pm10 = getValue(reading, ["pm10"]);
+                const aqi = getValue(reading, ["aqi"]);
+                const recordedAt = getValue(reading, ["recorded_at", "timestamp"]);
+                const source = getValue(reading, ["data_source", "source"], "Unknown");
+
+                return `
+                    <section class="card">
+                        <h3>${escapeHTML(sensorId)}</h3>
+                        <p class="sensor-detail">
+                            Temperature: <strong>${displayValue(temperature, " °C")}</strong>
+                        </p>
+                        <p class="sensor-detail">
+                            Humidity: <strong>${displayValue(humidity, " %")}</strong>
+                        </p>
+                        <p class="sensor-detail">
+                            PM2.5: <strong>${displayValue(pm25)}</strong>
+                        </p>
+                        <p class="sensor-detail">
+                            PM10: <strong>${displayValue(pm10)}</strong>
+                        </p>
+                        <p class="sensor-detail">
+                            AQI: <strong>${displayValue(aqi)}</strong>
+                        </p>
+                        <p class="sensor-detail">
+                            Recorded: ${formatDate(recordedAt)}
+                        </p>
+                        <p class="sensor-detail muted">
+                            Source: ${escapeHTML(source)}
+                        </p>
+                    </section>
+                `;
+            }).join("");
+        }
+
+        function renderHistoricalReadings(readings) {
+            const tbody = document.getElementById("historyRows");
+
+            if (!readings.length) {
+                tbody.innerHTML =
+                    '<tr><td colspan="8">No historical readings found.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = readings.map(reading => {
+                const sensorId = getValue(reading, ["sensor_id"], "Unknown");
+                const temperature = getValue(reading, ["temperature_c"]);
+                const humidity = getValue(reading, ["humidity_percent"]);
+                const pm25 = getValue(reading, ["pm25"]);
+                const pm10 = getValue(reading, ["pm10"]);
+                const aqi = getValue(reading, ["aqi"]);
+                const recordedAt = getValue(reading, ["recorded_at", "timestamp"]);
+                const source = getValue(reading, ["data_source", "source"], "Unknown");
+
+                return `
+                    <tr>
+                        <td>${escapeHTML(sensorId)}</td>
+                        <td>${displayValue(temperature)}</td>
+                        <td>${displayValue(humidity)}</td>
+                        <td>${displayValue(pm25)}</td>
+                        <td>${displayValue(pm10)}</td>
+                        <td>${displayValue(aqi)}</td>
+                        <td>${formatDate(recordedAt)}</td>
+                        <td>${escapeHTML(source)}</td>
+                    </tr>
+                `;
+            }).join("");
+        }
+
+        async function loadReadings() {
+            const data = await fetchJSON(API.readings);
+            const readings = getArray(data, ["readings", "data", "results"]);
+
+            document.getElementById("totalReadings").textContent =
+                getValue(data, ["total", "count"], readings.length);
+
+            renderLatestReadings(readings);
+            renderHistoricalReadings(readings);
+        }
+
+        async function loadAnalytics() {
+            const data = await fetchJSON(API.analytics);
+
+            document.getElementById("averageTemperature").textContent =
+                data.average_temperature_c == null
+                    ? "--"
+                    : formatNumber(data.average_temperature_c) + " °C";
+
+            document.getElementById("averageHumidity").textContent =
+                data.average_humidity_percent == null
+                    ? "--"
+                    : formatNumber(data.average_humidity_percent) + " %";
+
+            document.getElementById("averageAQI").textContent =
+                data.average_aqi == null
+                    ? "--"
+                    : formatNumber(data.average_aqi);
+
+            document.getElementById("analyticsNote").textContent =
+                data.note ||
+                "Analytics are based on stored readings; zero placeholder values may be excluded.";
+
+            const aqiStatus = data.aqi_status || {};
+            const category = getValue(aqiStatus, ["category"], "Unavailable");
+            const risk = getValue(aqiStatus, ["risk"], "Unknown");
+            const message = getValue(
+                aqiStatus,
+                ["message"],
+                "No air quality message is available."
+            );
+
+            document.getElementById("aqiCategory").textContent = category;
+            document.getElementById("aqiRisk").textContent = risk;
+            document.getElementById("aqiMessage").textContent = message;
+
+            document.getElementById("latestAQI").textContent =
+                data.latest_available_aqi == null
+                    ? "--"
+                    : formatNumber(data.latest_available_aqi);
+
+            const riskCard = document.getElementById("riskCard");
+            riskCard.classList.remove("high", "low");
+
+            const riskText = String(risk).toLowerCase();
+
+            if (riskText === "high" || riskText === "very high") {
+                riskCard.classList.add("high");
+            } else if (riskText === "low") {
+                riskCard.classList.add("low");
+            }
+        }
+
+        async function loadAlerts() {
+            const data = await fetchJSON(API.alerts);
+            const alerts = getArray(data, ["alerts", "data", "results"]);
+
+            document.getElementById("totalAlerts").textContent =
+                getValue(data, ["total", "count"], alerts.length);
+
+            const container = document.getElementById("alertsContainer");
+
+            if (!alerts.length) {
+                container.innerHTML =
+                    '<section class="card empty-message">No alerts found.</section>';
+                return;
+            }
+
+            container.innerHTML = alerts.map(alert => {
+                const title = getValue(alert, ["title", "alert_type", "name"], "System Alert");
+                const message = getValue(alert, ["message", "description"], "No description available.");
+                const severity = getValue(alert, ["severity"], "unknown");
+                const status = getValue(alert, ["status"], "unknown");
+                const createdAt = getValue(alert, ["created_at", "timestamp"]);
+                const highSeverity = String(severity).toLowerCase() === "high";
+
+                return `
+                    <section class="card alert-card ${highSeverity ? "high" : ""}">
+                        <h3>${escapeHTML(title)}</h3>
+                        <p>${escapeHTML(message)}</p>
+                        <p class="alert-meta">
+                            Severity: <strong>${escapeHTML(severity)}</strong>
+                            &nbsp; | &nbsp;
+                            Status: <strong>${escapeHTML(status)}</strong>
+                        </p>
+                        ${createdAt !== "--" ? `
+                            <p class="alert-meta">
+                                Created: ${formatDate(createdAt)}
+                            </p>
+                        ` : ""}
+                    </section>
+                `;
+            }).join("");
+        }
+
+        async function loadDashboard() {
+            const button = document.getElementById("refreshButton");
+            button.disabled = true;
+            button.textContent = "Refreshing...";
+            clearError();
+
+            const results = await Promise.allSettled([
+                loadHealth(),
+                loadSensors(),
+                loadReadings(),
+                loadAnalytics(),
+                loadAlerts()
+            ]);
+
+            const failedTasks = results.filter(result => result.status === "rejected");
+
+            if (failedTasks.length > 0) {
+                console.error("Dashboard loading errors:", failedTasks);
+
+                setError(
+                    "Some dashboard data could not be loaded. Check that Flask is running and the API endpoints are available, then refresh."
+                );
+            }
+
+            document.getElementById("lastRefreshed").textContent =
+                "Last refreshed: " + new Date().toLocaleTimeString();
+
+            button.disabled = false;
+            button.textContent = "Refresh Dashboard";
+        }
+
+        document.addEventListener("DOMContentLoaded", loadDashboard);
+    </script>
+</body>
+</html>
