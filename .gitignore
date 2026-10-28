@@ -1,6 +1,12 @@
 .env
 .venv/
+.venv313/
 __pycache__/
 *.py[cod]
 .DS_Store
 .vscode/
+templates/*.backup
+templates/*.backup2
+templates/*.before_sidebar
+templates/*.safe-backup
+templates/*.ui-backup
