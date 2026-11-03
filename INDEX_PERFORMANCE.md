@@ -47,3 +47,38 @@ The execution time was 1 ms in both tests, so these measurements do not show a t
 
 ### Conclusion
 The `explain()` results demonstrate the difference between index scanning (`IXSCAN`) and collection scanning (`COLLSCAN`). The existing compound index supports filtering by sensor ID and recording date.
+
+
+## Verified Index Explain Results
+
+Test query: filter by sensor_id, sort by recorded_at descending, limit 20.
+
+| Metric | Collection Scan | Compound Index |
+|---|---:|---:|
+| Documents examined | 1538 | 1 |
+| Index keys examined | N/A | 1 |
+| Documents returned | 1 | 1 |
+| Query plan | COLLSCAN + SORT | IXSCAN + FETCH |
+
+Index used: sensor_id_1_recorded_at_-1
+
+Result: PASS. The indexed query examined 1 document compared with 1538 documents in the collection-scan baseline. This is an execution-statistics comparison, not a guaranteed runtime speedup.
+
+
+## MongoDB Time-Series Insert/Read Test
+
+Collection: sensor_readings_ts
+Time field: recorded_at
+Metadata field: sensor_id
+Test sensor: SENSOR-TS-TEST
+Test data source: timeseries-insert-read-test
+
+- Insert operation: PASS
+- Read operation: PASS
+- Temperature: 28.5 C
+- Humidity: 60 percent
+- PM2.5: 12.5
+- PM10: 20
+- AQI: 45
+
+Result: PASS. One test measurement was inserted and successfully retrieved. The test measurement remains in the Time-Series collection.
