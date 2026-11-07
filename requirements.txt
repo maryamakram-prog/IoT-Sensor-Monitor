@@ -4,3 +4,6 @@ pymongo
 python-dotenv
 requests
 tzdata
+streamlit
+pandas
+plotly
