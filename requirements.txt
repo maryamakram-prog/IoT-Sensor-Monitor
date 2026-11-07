@@ -1,6 +1,9 @@
-gunicorn
+﻿gunicorn
 Flask
 pymongo
 python-dotenv
 requests
 tzdata
+streamlit
+pandas
+plotly
