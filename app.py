@@ -9,6 +9,7 @@ from bson import ObjectId
 
 from crud_routes import crud
 
+
 # --------------------------------------------------
 # 1. FLASK APP AND MONGODB CONNECTION
 # --------------------------------------------------
@@ -41,6 +42,7 @@ app.register_blueprint(crud)
 # --------------------------------------------------
 
 def convert_bson(value):
+
     if isinstance(value, ObjectId):
         return str(value)
 
@@ -67,6 +69,7 @@ def convert_bson(value):
 # --------------------------------------------------
 
 def numeric(reading, field):
+
     value = reading.get(field)
 
     if isinstance(value, bool):
@@ -79,6 +82,7 @@ def numeric(reading, field):
 
 
 def valid_measurement(reading, field):
+
     value = numeric(reading, field)
 
     if value is None:
@@ -97,6 +101,7 @@ def valid_measurement(reading, field):
 
     # Ignore known demo placeholder values.
     # Database documents are not modified.
+
     if source == "demo":
 
         if (
@@ -113,7 +118,6 @@ def valid_measurement(reading, field):
         ):
             return None
 
-    # Negative AQI is invalid.
     if field == "aqi" and value < 0:
         return None
 
@@ -121,8 +125,10 @@ def valid_measurement(reading, field):
 
 
 def average(values):
+
     valid_values = [
-        value for value in values
+        value
+        for value in values
         if value is not None
     ]
 
@@ -140,6 +146,7 @@ def average(values):
 # --------------------------------------------------
 
 def aqi_category(aqi):
+
     if aqi is None:
         return {
             "category": "Unavailable",
@@ -208,6 +215,7 @@ def aqi_category(aqi):
 # --------------------------------------------------
 
 def recent_readings(limit=100):
+
     return list(
         db.readings.find(
             {},
@@ -219,6 +227,7 @@ def recent_readings(limit=100):
 
 
 def all_readings():
+
     return list(
         db.readings.find(
             {},
@@ -230,6 +239,7 @@ def all_readings():
 
 
 def clean_readings(readings):
+
     cleaned = []
 
     fields = (
@@ -241,13 +251,19 @@ def clean_readings(readings):
     )
 
     for item in readings:
+
         row = dict(item)
 
         for field in fields:
-            value = valid_measurement(row, field)
+
+            value = valid_measurement(
+                row,
+                field
+            )
 
             if value is not None:
                 row[field] = value
+
             elif field in row:
                 row[field] = None
 
@@ -262,6 +278,7 @@ def clean_readings(readings):
 
 @app.route("/")
 def home():
+
     return render_template("index.html")
 
 
@@ -271,7 +288,9 @@ def home():
 
 @app.route("/api/health")
 def health():
+
     try:
+
         client.admin.command("ping")
 
         return jsonify({
@@ -284,6 +303,7 @@ def health():
         })
 
     except Exception:
+
         app.logger.exception(
             "MongoDB connection failed"
         )
@@ -304,7 +324,9 @@ def health():
 
 @app.route("/api/counts")
 def counts():
+
     try:
+
         total_sensors = db.sensors.count_documents({})
         total_readings = db.readings.count_documents({})
         total_alerts = db.alerts.count_documents({})
@@ -317,16 +339,22 @@ def counts():
         })
 
         return jsonify({
+
             "total_sensors": total_sensors,
+
             "total_readings": total_readings,
+
             "total_alerts": total_alerts,
+
             "active_sensors": active_sensors,
+
             "inactive_sensors": (
                 total_sensors - active_sensors
             )
         })
 
     except Exception:
+
         app.logger.exception(
             "Could not load database counts"
         )
@@ -342,7 +370,9 @@ def counts():
 
 @app.route("/api/sensors")
 def get_sensors():
+
     try:
+
         sensors = list(
             db.sensors.find(
                 {},
@@ -350,9 +380,12 @@ def get_sensors():
             ).sort("sensor_id", 1)
         )
 
-        return jsonify(convert_bson(sensors))
+        return jsonify(
+            convert_bson(sensors)
+        )
 
     except Exception:
+
         app.logger.exception(
             "Could not load sensors"
         )
@@ -368,8 +401,11 @@ def get_sensors():
 
 @app.route("/api/readings")
 def get_readings():
+
     try:
+
         readings = recent_readings(100)
+
         cleaned = clean_readings(readings)
 
         return jsonify(
@@ -377,6 +413,7 @@ def get_readings():
         )
 
     except Exception:
+
         app.logger.exception(
             "Could not load readings"
         )
@@ -392,7 +429,9 @@ def get_readings():
 
 @app.route("/api/alerts")
 def get_alerts():
+
     try:
+
         alerts = list(
             db.alerts.find(
                 {},
@@ -407,6 +446,7 @@ def get_alerts():
         )
 
     except Exception:
+
         app.logger.exception(
             "Could not load alerts"
         )
@@ -422,31 +462,35 @@ def get_alerts():
 
 @app.route("/api/analytics")
 def get_analytics():
+
     try:
+
         readings = all_readings()
 
         temperatures = [
             valid_measurement(
-                reading, "temperature_c"
+                reading,
+                "temperature_c"
             )
             for reading in readings
         ]
 
         humidities = [
             valid_measurement(
-                reading, "humidity_percent"
+                reading,
+                "humidity_percent"
             )
             for reading in readings
         ]
 
         aqis = [
             valid_measurement(
-                reading, "aqi"
+                reading,
+                "aqi"
             )
             for reading in readings
         ]
 
-        # Ignore unavailable and zero AQI values.
         valid_aqis = [
             value
             for value in aqis
@@ -454,6 +498,7 @@ def get_analytics():
         ]
 
         # Readings are sorted newest first.
+
         latest_aqi = (
             valid_aqis[0]
             if valid_aqis
@@ -463,6 +508,7 @@ def get_analytics():
         status = aqi_category(latest_aqi)
 
         return jsonify({
+
             "total_readings": (
                 db.readings.count_documents({})
             ),
@@ -484,8 +530,11 @@ def get_analytics():
             "aqi_status": status,
 
             # Frontend compatibility fields
+
             "aqi_category": status["category"],
+
             "aqi_risk": status["risk"],
+
             "aqi_message": status["message"],
 
             "readings_analyzed": len(readings),
@@ -498,6 +547,7 @@ def get_analytics():
         })
 
     except Exception:
+
         app.logger.exception(
             "Could not calculate analytics"
         )
@@ -512,4 +562,9 @@ def get_analytics():
 # --------------------------------------------------
 
 if __name__ == "__main__":
-    app.run(debug=True)
+
+    app.run(
+        debug=True,
+        host="127.0.0.1",
+        port=5000
+    )
