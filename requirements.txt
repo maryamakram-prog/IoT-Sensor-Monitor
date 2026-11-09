@@ -6,4 +6,10 @@ requests
 tzdata
 streamlit
 pandas
+numpy
 plotly
+reportlab
+pydeck
+folium
+streamlit-folium
+streamlit-searchbox
