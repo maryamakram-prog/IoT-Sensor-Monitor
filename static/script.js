@@ -97,6 +97,16 @@ async function checkConnection() {
 /* WEATHER & AIR QUALITY DISPLAY                             */
 /* ========================================================= */
 
+function formatSourceTag(source) {
+    if (source === "open-meteo-api") {
+        return `<span class="tag-source tag-live">● Live Station API</span>`;
+    }
+    if (source === "open-meteo-historical") {
+        return `<span class="tag-source tag-archive">📁 Historical Archive (July–Aug)</span>`;
+    }
+    return `<span class="tag-source tag-demo">🧪 Demo Record</span>`;
+}
+
 function displayWeather(latest) {
     if (!latest && allReadings.length) {
         // Find newest record with temperature or AQI data
@@ -115,7 +125,7 @@ function displayWeather(latest) {
     // Hero Card
     setText("weatherTemperature", temp !== null ? `${Number(temp).toFixed(1)}°C` : "—°C");
     setText("weatherHeroSub", `Real-time meteorological & air quality observations for Hyderabad, Sindh, Pakistan.`);
-    setText("weatherObsTime", `Latest Telemetry: ${dateFormatted} · ${source}`);
+    setText("weatherObsTime", `Latest Telemetry: ${dateFormatted} · ${source === "open-meteo-api" ? "Live Station API Feed" : "Historical Archive"}`);
 
     // Weather condition & icons
     const tempNum = Number(temp);
@@ -150,16 +160,16 @@ function displayWeather(latest) {
     setText("weatherIcon", iconText);
     setText("weatherIconLabel", iconLabel);
 
-    // Weather Grid Elements
+    // Weather Grid Elements - clearly showing contrast against historical baseline
     setText("temperatureValue", temp !== null ? Number(temp).toFixed(1) : "—");
-    setText("tempFeelBadge", `Thermal: ${tempTag}`);
+    setText("tempFeelBadge", `Current: ${temp !== null ? Number(temp).toFixed(1) : '—'}°C (vs 30.9°C summer baseline)`);
 
     setText("humidityValue", hum !== null ? Number(hum).toFixed(1) : "—");
     const humNum = Number(hum);
     let humStatus = "Normal moisture";
-    if (humNum < 25) humStatus = "Dry air";
+    if (humNum < 25) humStatus = "Dry autumn air";
     else if (humNum > 70) humStatus = "High humidity";
-    setText("humidityBadge", humStatus);
+    setText("humidityBadge", `${humStatus} (vs 64.0% monsoon baseline)`);
 
     setText("pm25Value", pm25 !== null ? Number(pm25).toFixed(1) : "—");
     const pm25Num = Number(pm25);
@@ -236,7 +246,7 @@ function displayWeather(latest) {
                 <td>${formatNumber(r.pm25)} μg/m³</td>
                 <td>${formatNumber(r.pm10)} μg/m³</td>
                 <td><span class="badge aqi-badge aqi-${r.aqi <= 50 ? 'good' : r.aqi <= 100 ? 'moderate' : 'sensitive'}">${formatNumber(r.aqi, 0)}</span></td>
-                <td><span class="tag-source">${safe(r.data_source || 'historical')}</span></td>
+                <td>${formatSourceTag(r.data_source)}</td>
             </tr>
         `).join("") || `<tr><td colspan="7">No records available.</td></tr>`;
     }
@@ -256,7 +266,7 @@ function displayAnalytics(data) {
     setText("averageAQI", avgAqi !== null ? `${formatNumber(avgAqi, 0)} AQI` : "—");
 
     const aqiStatus = data.aqi_status || {};
-    setText("aqiRiskLabel", aqiStatus.message || "Mean environmental index across dataset");
+    setText("aqiRiskLabel", aqiStatus.message || "Historical summer monsoon baseline average");
 }
 
 /* ========================================================= */
@@ -271,9 +281,16 @@ async function loadDashboard() {
             getData(API.readings)
         ]);
 
+        const totalReadings = value(counts, "total_readings", "readings");
         setText("totalSensors", formatNumber(value(counts, "total_sensors", "sensors"), 0));
-        setText("totalReadings", formatNumber(value(counts, "total_readings", "readings"), 0));
+        setText("totalReadings", formatNumber(totalReadings, 0));
         setText("totalAlerts", formatNumber(value(counts, "total_alerts", "alerts"), 0));
+        setText("sidebarDocCount", `${formatNumber(totalReadings, 0)} Telemetry Documents`);
+
+        const disc = $("disclaimerDocText");
+        if (disc) {
+            disc.textContent = `Environmental measurements combine the Open-Meteo atmospheric reanalysis archive (1,488 documents) and live meteorological telemetry for Hyderabad (${formatNumber(totalReadings, 0)} total records in MongoDB Atlas). Seeded for database performance benchmarking without physical IoT hardware.`;
+        }
 
         displayAnalytics(analytics);
 
@@ -294,7 +311,7 @@ async function loadDashboard() {
                     <td>${formatNumber(r.pm25)}</td>
                     <td><span class="badge aqi-${r.aqi <= 50 ? 'good' : r.aqi <= 100 ? 'moderate' : 'sensitive'}">${formatNumber(r.aqi, 0)}</span></td>
                     <td>${formatDate(value(r, "recorded_at", "timestamp"))}</td>
-                    <td><span class="tag-source">${safe(r.data_source || 'telemetry')}</span></td>
+                    <td>${formatSourceTag(r.data_source)}</td>
                 </tr>
             `).join("") || `<tr><td colspan="7">No stored readings found.</td></tr>`;
         }
@@ -492,8 +509,9 @@ function renderReadings(target, records) {
             ${target === "historyTable" ? `<td>${formatNumber(r.pm10)}</td>` : ""}
             <td><span class="badge aqi-${r.aqi <= 50 ? 'good' : r.aqi <= 100 ? 'moderate' : 'sensitive'}">${formatNumber(r.aqi, 0)}</span></td>
             <td>${formatDate(value(r, "recorded_at", "timestamp"))}</td>
+            <td>${formatSourceTag(r.data_source)}</td>
         </tr>
-    `).join("") || `<tr><td colspan="7">No records found.</td></tr>`;
+    `).join("") || `<tr><td colspan="8">No records found.</td></tr>`;
 }
 
 async function loadReadings() {

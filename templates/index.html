@@ -198,21 +198,21 @@
 
                 <div class="stats-grid three">
                     <div class="stat-card orange">
-                        <div class="stat-top">Average Temperature</div>
+                        <div class="stat-top">Historical Avg Temperature</div>
                         <h2 id="averageTemperature">—</h2>
-                        <p>Aggregated across historical readings</p>
+                        <p>Summer Monsoon Baseline (July–August Archive)</p>
                     </div>
 
                     <div class="stat-card teal">
-                        <div class="stat-top">Average Humidity</div>
+                        <div class="stat-top">Historical Avg Humidity</div>
                         <h2 id="averageHumidity">—</h2>
-                        <p>Mean relative humidity (%)</p>
+                        <p>Summer Monsoon Baseline (High Humidity ~64%)</p>
                     </div>
 
                     <div class="stat-card purple">
-                        <div class="stat-top">Latest Available AQI</div>
+                        <div class="stat-top">Current Observation AQI</div>
                         <h2 id="aqiValue">—</h2>
-                        <p id="aqiRiskLabel">Air pollution risk factor</p>
+                        <p id="aqiRiskLabel">Real-time November measurement</p>
                     </div>
                 </div>
             </section>
@@ -293,25 +293,25 @@
                 <div class="metric-card orange">
                     <div class="metric-top">
                         <span class="metric-icon">🌡️</span>
-                        <span>Temperature</span>
+                        <span>Current Temperature</span>
                     </div>
                     <div class="metric-value-row">
                         <h2 id="temperatureValue">—</h2>
                         <span class="metric-unit">°C</span>
                     </div>
-                    <div class="metric-sub" id="tempFeelBadge">Thermal measurement</div>
+                    <div class="metric-sub" id="tempFeelBadge">November observation (vs 30.9°C summer baseline)</div>
                 </div>
 
                 <div class="metric-card blue">
                     <div class="metric-top">
                         <span class="metric-icon">💧</span>
-                        <span>Relative Humidity</span>
+                        <span>Current Relative Humidity</span>
                     </div>
                     <div class="metric-value-row">
                         <h2 id="humidityValue">—</h2>
                         <span class="metric-unit">%</span>
                     </div>
-                    <div class="metric-sub" id="humidityBadge">Moisture level</div>
+                    <div class="metric-sub" id="humidityBadge">Dry season (vs 64.0% summer monsoon baseline)</div>
                 </div>
 
                 <div class="metric-card purple">
@@ -508,21 +508,21 @@
 
             <section class="stats-grid three">
                 <div class="stat-card orange">
-                    <div class="stat-top">Average Temperature <span>🌡️</span></div>
+                    <div class="stat-top">Historical Avg Temperature <span>🌡️</span></div>
                     <h2 id="averageTemperature">—</h2>
-                    <p>Across 1,500+ readings</p>
+                    <p>Summer Baseline (July–August Monsoon Archive: ~30.9°C)</p>
                 </div>
 
                 <div class="stat-card teal">
-                    <div class="stat-top">Average Humidity <span>💧</span></div>
+                    <div class="stat-top">Historical Avg Humidity <span>💧</span></div>
                     <h2 id="averageHumidity">—</h2>
-                    <p>Mean atmospheric moisture (%)</p>
+                    <p>Summer Monsoon Moisture Baseline (~64.0%)</p>
                 </div>
 
                 <div class="stat-card purple">
                     <div class="stat-top">Mean Air Quality Index <span>🍃</span></div>
                     <h2 id="averageAQI">—</h2>
-                    <p id="aqiRiskLabel">Computed average AQI</p>
+                    <p id="aqiRiskLabel">Computed average AQI across dataset</p>
                 </div>
             </section>
 
@@ -622,6 +622,7 @@
                                 <th>PM2.5 (μg/m³)</th>
                                 <th>US AQI</th>
                                 <th>Recorded At</th>
+                                <th>Data Source</th>
                             </tr>
                         </thead>
                         <tbody id="readingsTable"></tbody>
@@ -656,6 +657,7 @@
                                 <th>PM10</th>
                                 <th>AQI</th>
                                 <th>Recorded At</th>
+                                <th>Data Source</th>
                             </tr>
                         </thead>
                         <tbody id="historyTable"></tbody>

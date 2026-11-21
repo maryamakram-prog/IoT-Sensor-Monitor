@@ -86,7 +86,7 @@ def main():
                 "relative_humidity_2m"
             ),
             "past_hours": 24,
-            "forecast_hours": 24,
+            "forecast_hours": 0,
             "timezone": "Asia/Karachi"
         }
     )
@@ -100,7 +100,7 @@ def main():
             "longitude": LONGITUDE,
             "hourly": "pm2_5,pm10,us_aqi",
             "past_hours": 24,
-            "forecast_hours": 24,
+            "forecast_hours": 0,
             "timezone": "Asia/Karachi"
         }
     )
