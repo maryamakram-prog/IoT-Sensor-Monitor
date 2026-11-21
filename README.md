@@ -206,9 +206,4 @@ MONGO_DB=IoTSensorMonitor
 
 ---
 
-## 🎓 Viva & Evaluation Quick Reference
 
-* **Why referencing over embedding?** Avoids 16MB document limit and document growth penalty as sensor readings increase indefinitely.
-* **How was `explain()` tested?** Executed on `readings` query with and without `{ sensor_id: 1, recorded_at: -1 }`. Resulted in `COLLSCAN` (1,538 docs examined) vs `IXSCAN` (1 doc examined).
-* **Which advanced feature is present?** Both `2dsphere` geospatial proximity indexing (`$near`) on `locations` and native MongoDB Time-Series collections (`sensor_readings_ts`).
-* **Where are aggregations executed?** Directly in MongoDB Atlas via pipelines using `$match`, `$group`, `$avg`, `$hour`, `$dateToString`, and `$bucket`.
