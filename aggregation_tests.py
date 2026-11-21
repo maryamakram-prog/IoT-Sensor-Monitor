@@ -1,5 +1,6 @@
 
 import os
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from pymongo import MongoClient
 
@@ -28,9 +29,9 @@ def main():
 
         pipelines = [
             (
-                "1. Average temperature and humidity",
+                "1. Average temperature and humidity (Excluding Demo Records)",
                 [
-                    {"$match": {"data_source": "open-meteo-historical"}},
+                    {"$match": {"temperature_c": {"$ne": None}, "data_source": {"$ne": "demo"}}},
                     {"$group": {
                         "_id": "$sensor_id",
                         "avg_temperature": {"$avg": "$temperature_c"},
@@ -42,7 +43,7 @@ def main():
             (
                 "2. Hourly record counts",
                 [
-                    {"$match": {"data_source": "open-meteo-historical"}},
+                    {"$match": {"recorded_at": {"$ne": None}}},
                     {"$group": {
                         "_id": {"$hour": "$recorded_at"},
                         "records": {"$sum": 1}
@@ -51,9 +52,17 @@ def main():
                 ]
             ),
             (
-                "3. Daily temperature summary",
+                "3. Daily temperature summary (Actual Last 7 Calendar Days)",
                 [
-                    {"$match": {"data_source": "open-meteo-historical"}},
+                    {
+                        "$match": {
+                            "recorded_at": {
+                                "$gte": (datetime.now() - timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0),
+                                "$lte": datetime.now()
+                            },
+                            "temperature_c": {"$ne": None}
+                        }
+                    },
                     {"$group": {
                         "_id": {
                             "$dateToString": {
@@ -66,8 +75,8 @@ def main():
                         "avg_temperature": {"$avg": "$temperature_c"},
                         "records": {"$sum": 1}
                     }},
-                    {"$sort": {"_id": 1}},
-                    {"$limit": 10}
+                    {"$sort": {"_id": -1}},
+                    {"$limit": 7}
                 ]
             ),
             (

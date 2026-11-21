@@ -1,6 +1,6 @@
 
 import os
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 
 from flask import Flask, jsonify, render_template, request
 from pymongo import MongoClient
@@ -170,7 +170,7 @@ def aqi_category(aqi):
         return {
             "category": "Moderate",
             "risk": "Moderate",
-            "message": "Sensitive people should monitor air quality."
+            "message": "Air quality is acceptable. However, unusually sensitive people should consider limiting prolonged outdoor exertion."
         }
 
     if aqi <= 150:
@@ -514,6 +514,11 @@ def get_analytics():
                 "$facet": {
                     "overall": [
                         {
+                            "$match": {
+                                "data_source": {"$ne": "demo"}
+                            }
+                        },
+                        {
                             "$group": {
                                 "_id": None,
                                 "total_records": {"$sum": 1},
@@ -637,9 +642,14 @@ def run_aggregations():
     required by the project rubric.
     """
     try:
-        # Pipeline 1: Avg Temp & Humidity by Sensor
+        # Pipeline 1: Avg Temp & Humidity by Sensor (Excluding Demo Records)
         p1 = list(db.readings.aggregate([
-            {"$match": {"temperature_c": {"$ne": None}}},
+            {
+                "$match": {
+                    "temperature_c": {"$ne": None},
+                    "data_source": {"$ne": "demo"}
+                }
+            },
             {"$group": {
                 "_id": "$sensor_id",
                 "avg_temperature": {"$avg": "$temperature_c"},
@@ -658,15 +668,26 @@ def run_aggregations():
             {"$sort": {"_id": 1}}
         ]))
 
-        # Pipeline 3: Daily Summary using $dateToString
+        # Pipeline 3: Daily Summary for Actual Last 7 Calendar Days
+        now = datetime.now()
+        seven_days_ago = (now - timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
+
         p3 = list(db.readings.aggregate([
-            {"$match": {"recorded_at": {"$ne": None}, "temperature_c": {"$ne": None}}},
+            {
+                "$match": {
+                    "recorded_at": {
+                        "$gte": seven_days_ago,
+                        "$lte": now
+                    },
+                    "temperature_c": {"$ne": None}
+                }
+            },
             {"$group": {
                 "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$recorded_at"}},
-                "min_temp": {"$min": "$temperature_c"},
-                "max_temp": {"$max": "$temperature_c"},
-                "avg_temp": {"$avg": "$temperature_c"},
-                "count": {"$sum": 1}
+                "min_temperature": {"$min": "$temperature_c"},
+                "max_temperature": {"$max": "$temperature_c"},
+                "avg_temperature": {"$avg": "$temperature_c"},
+                "records": {"$sum": 1}
             }},
             {"$sort": {"_id": -1}},
             {"$limit": 7}
