@@ -2,7 +2,7 @@
 import os
 from datetime import datetime, date, timezone
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from bson import ObjectId
@@ -10,11 +10,19 @@ from bson import ObjectId
 from crud_routes import crud
 
 
-# --------------------------------------------------
+# ==================================================
 # 1. FLASK APP AND MONGODB CONNECTION
-# --------------------------------------------------
+# ==================================================
 
 load_dotenv()
+
+# Configure DNS resolver to avoid Windows SRV query SERVFAIL issues
+try:
+    import dns.resolver
+    dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
+    dns.resolver.default_resolver.nameservers = ["8.8.8.8", "1.1.1.1"]
+except Exception:
+    pass
 
 app = Flask(__name__)
 
@@ -37,9 +45,9 @@ app.config["mongo_db"] = db
 app.register_blueprint(crud)
 
 
-# --------------------------------------------------
-# 2. CONVERT MONGODB VALUES TO JSON-SAFE VALUES
-# --------------------------------------------------
+# ==================================================
+# 2. JSON CONVERSION
+# ==================================================
 
 def convert_bson(value):
 
@@ -64,9 +72,9 @@ def convert_bson(value):
     return value
 
 
-# --------------------------------------------------
-# 3. VALIDATE SENSOR MEASUREMENTS
-# --------------------------------------------------
+# ==================================================
+# 3. MEASUREMENT VALIDATION
+# ==================================================
 
 def numeric(reading, field):
 
@@ -98,9 +106,6 @@ def valid_measurement(reading, field):
     sensor_id = str(
         reading.get("sensor_id", "")
     ).upper()
-
-    # Ignore known demo placeholder values.
-    # Database documents are not modified.
 
     if source == "demo":
 
@@ -141,9 +146,9 @@ def average(values):
     )
 
 
-# --------------------------------------------------
-# 4. AIR QUALITY INDEX CATEGORY
-# --------------------------------------------------
+# ==================================================
+# 4. AQI CATEGORY
+# ==================================================
 
 def aqi_category(aqi):
 
@@ -151,9 +156,7 @@ def aqi_category(aqi):
         return {
             "category": "Unavailable",
             "risk": "Unknown",
-            "message": (
-                "No valid AQI measurement is available yet."
-            )
+            "message": "No valid AQI measurement is available yet."
         }
 
     if aqi <= 50:
@@ -167,52 +170,40 @@ def aqi_category(aqi):
         return {
             "category": "Moderate",
             "risk": "Moderate",
-            "message": (
-                "Sensitive people should monitor air quality."
-            )
+            "message": "Sensitive people should monitor air quality."
         }
 
     if aqi <= 150:
         return {
             "category": "Unhealthy for Sensitive Groups",
             "risk": "Elevated",
-            "message": (
-                "Sensitive groups may experience health effects."
-            )
+            "message": "Sensitive groups may experience health effects."
         }
 
     if aqi <= 200:
         return {
             "category": "Unhealthy",
             "risk": "High",
-            "message": (
-                "Health effects may occur. "
-                "Reduce outdoor exposure."
-            )
+            "message": "Health effects may occur. Reduce outdoor exposure."
         }
 
     if aqi <= 300:
         return {
             "category": "Very Unhealthy",
             "risk": "Very High",
-            "message": (
-                "Avoid prolonged outdoor exposure."
-            )
+            "message": "Avoid prolonged outdoor exposure."
         }
 
     return {
         "category": "Hazardous",
         "risk": "Severe",
-        "message": (
-            "Air quality is hazardous. "
-            "Avoid outdoor exposure."
-        )
+        "message": "Air quality is hazardous. Avoid outdoor exposure."
     }
 
 
-# --------------------------------------------------
-# 5. FETCH READINGS
-# --------------------------------------------------
+# ==================================================
+# 5. DATABASE READING FUNCTIONS
+# ==================================================
 
 def recent_readings(limit=100):
 
@@ -256,10 +247,7 @@ def clean_readings(readings):
 
         for field in fields:
 
-            value = valid_measurement(
-                row,
-                field
-            )
+            value = valid_measurement(row, field)
 
             if value is not None:
                 row[field] = value
@@ -272,19 +260,76 @@ def clean_readings(readings):
     return cleaned
 
 
-# --------------------------------------------------
-# 6. DASHBOARD HOME
-# --------------------------------------------------
+# ==================================================
+# 6. FRONTEND NAVIGATION ROUTES
+# ==================================================
 
 @app.route("/")
 def home():
 
-    return render_template("index.html")
+    return render_template(
+        "index.html",
+        page="dashboard"
+    )
 
 
-# --------------------------------------------------
-# 7. MONGODB CONNECTION STATUS
-# --------------------------------------------------
+@app.route("/analytics")
+def analytics_page():
+
+    return render_template(
+        "index.html",
+        page="analytics"
+    )
+
+
+@app.route("/weather")
+def weather_page():
+
+    return render_template(
+        "index.html",
+        page="weather"
+    )
+
+
+@app.route("/sensors")
+def sensors_page():
+
+    return render_template(
+        "index.html",
+        page="sensors"
+    )
+
+
+@app.route("/latest-readings")
+def latest_readings_page():
+
+    return render_template(
+        "index.html",
+        page="latest"
+    )
+
+
+@app.route("/history")
+def history_page():
+
+    return render_template(
+        "index.html",
+        page="history"
+    )
+
+
+@app.route("/alerts")
+def alerts_page():
+
+    return render_template(
+        "index.html",
+        page="alerts"
+    )
+
+
+# ==================================================
+# 7. DATABASE HEALTH API
+# ==================================================
 
 @app.route("/api/health")
 def health():
@@ -310,17 +355,13 @@ def health():
 
         return jsonify({
             "status": "error",
-            "message": (
-                "MongoDB connection failed. "
-                "Check Atlas Network Access, "
-                "database user and MONGO_URI."
-            )
+            "message": "MongoDB connection failed."
         }), 500
 
 
-# --------------------------------------------------
-# 8. DASHBOARD COUNTS
-# --------------------------------------------------
+# ==================================================
+# 8. DASHBOARD COUNTS API
+# ==================================================
 
 @app.route("/api/counts")
 def counts():
@@ -351,6 +392,7 @@ def counts():
             "inactive_sensors": (
                 total_sensors - active_sensors
             )
+
         })
 
     except Exception:
@@ -364,9 +406,9 @@ def counts():
         }), 500
 
 
-# --------------------------------------------------
-# 9. GET ALL SENSORS
-# --------------------------------------------------
+# ==================================================
+# 9. SENSORS API
+# ==================================================
 
 @app.route("/api/sensors")
 def get_sensors():
@@ -395,9 +437,9 @@ def get_sensors():
         }), 500
 
 
-# --------------------------------------------------
-# 10. GET RECENT READINGS
-# --------------------------------------------------
+# ==================================================
+# 10. READINGS API
+# ==================================================
 
 @app.route("/api/readings")
 def get_readings():
@@ -423,9 +465,9 @@ def get_readings():
         }), 500
 
 
-# --------------------------------------------------
-# 11. GET ALERTS
-# --------------------------------------------------
+# ==================================================
+# 11. ALERTS API
+# ==================================================
 
 @app.route("/api/alerts")
 def get_alerts():
@@ -456,115 +498,228 @@ def get_alerts():
         }), 500
 
 
-# --------------------------------------------------
-# 12. ANALYTICS USING ALL STORED READINGS
-# --------------------------------------------------
+# ==================================================
+# 12. ANALYTICS API (MongoDB Aggregation Pipelines)
+# ==================================================
 
 @app.route("/api/analytics")
 def get_analytics():
-
+    """
+    Computes environmental statistics using MongoDB Aggregation Pipelines
+    with $facet, $group, $avg, $min, $max, and $bucket stages.
+    """
     try:
-
-        readings = all_readings()
-
-        temperatures = [
-            valid_measurement(
-                reading,
-                "temperature_c"
-            )
-            for reading in readings
+        pipeline = [
+            {
+                "$facet": {
+                    "overall": [
+                        {
+                            "$group": {
+                                "_id": None,
+                                "total_records": {"$sum": 1},
+                                "avg_temperature": {"$avg": "$temperature_c"},
+                                "min_temperature": {"$min": "$temperature_c"},
+                                "max_temperature": {"$max": "$temperature_c"},
+                                "avg_humidity": {"$avg": "$humidity_percent"},
+                                "min_humidity": {"$min": "$humidity_percent"},
+                                "max_humidity": {"$max": "$humidity_percent"},
+                                "avg_aqi": {"$avg": "$aqi"}
+                            }
+                        }
+                    ],
+                    "temperature_buckets": [
+                        {"$match": {"temperature_c": {"$ne": None}}},
+                        {
+                            "$bucket": {
+                                "groupBy": "$temperature_c",
+                                "boundaries": [0, 20, 30, 40, 60],
+                                "default": "other",
+                                "output": {"count": {"$sum": 1}}
+                            }
+                        }
+                    ],
+                    "latest_reading": [
+                        {"$sort": {"recorded_at": -1}},
+                        {"$limit": 1}
+                    ]
+                }
+            }
         ]
 
-        humidities = [
-            valid_measurement(
-                reading,
-                "humidity_percent"
-            )
-            for reading in readings
-        ]
+        agg_result = list(db.readings.aggregate(pipeline))
+        facet_data = agg_result[0] if agg_result else {}
 
-        aqis = [
-            valid_measurement(
-                reading,
-                "aqi"
-            )
-            for reading in readings
-        ]
+        overall = facet_data.get("overall", [{}])[0] if facet_data.get("overall") else {}
+        latest_doc = facet_data.get("latest_reading", [{}])[0] if facet_data.get("latest_reading") else {}
+        buckets = facet_data.get("temperature_buckets", [])
 
-        valid_aqis = [
-            value
-            for value in aqis
-            if value is not None and value > 0
-        ]
-
-        # Readings are sorted newest first.
-
-        latest_aqi = (
-            valid_aqis[0]
-            if valid_aqis
-            else None
-        )
-
+        latest_aqi = latest_doc.get("aqi")
         status = aqi_category(latest_aqi)
 
+        avg_temp = round(overall.get("avg_temperature", 0.0), 2) if overall.get("avg_temperature") is not None else None
+        avg_hum = round(overall.get("avg_humidity", 0.0), 2) if overall.get("avg_humidity") is not None else None
+        avg_aqi = round(overall.get("avg_aqi", 0.0), 2) if overall.get("avg_aqi") is not None else None
+
         return jsonify({
-
-            "total_readings": (
-                db.readings.count_documents({})
-            ),
-
-            "average_temperature_c": average(
-                temperatures
-            ),
-
-            "average_humidity_percent": average(
-                humidities
-            ),
-
-            "average_aqi": average(
-                valid_aqis
-            ),
-
+            "engine": "MongoDB Aggregation Pipeline ($facet, $group, $bucket)",
+            "total_readings": overall.get("total_records", db.readings.count_documents({})),
+            "average_temperature_c": avg_temp,
+            "min_temperature_c": overall.get("min_temperature"),
+            "max_temperature_c": overall.get("max_temperature"),
+            "average_humidity_percent": avg_hum,
+            "min_humidity_percent": overall.get("min_humidity"),
+            "max_humidity_percent": overall.get("max_humidity"),
+            "average_aqi": avg_aqi,
             "latest_available_aqi": latest_aqi,
-
+            "temperature_buckets": buckets,
             "aqi_status": status,
-
-            # Frontend compatibility fields
-
             "aqi_category": status["category"],
-
             "aqi_risk": status["risk"],
-
             "aqi_message": status["message"],
-
-            "readings_analyzed": len(readings),
-
-            "note": (
-                "Analytics use stored database records. "
-                "Historical or demo records are not "
-                "necessarily live sensor measurements."
-            )
+            "latest_reading": convert_bson(latest_doc),
+            "readings_analyzed": overall.get("total_records", 0)
         })
 
     except Exception:
+        app.logger.exception("Could not calculate aggregation analytics")
+        return jsonify({"error": "Could not calculate sensor analytics."}), 500
 
-        app.logger.exception(
-            "Could not calculate analytics"
-        )
+
+# ==================================================
+# 13. GEOSPATIAL SEARCH API ($near on 2dsphere)
+# ==================================================
+
+@app.route("/api/locations/nearby")
+def nearby_locations():
+    """
+    Demonstrates MongoDB Geospatial 2dsphere indexing and the $near operator.
+    Default coordinates: Hyderabad, Pakistan [68.3578, 25.3960]
+    """
+    try:
+        lon = float(request.args.get("lon", 68.3578))
+        lat = float(request.args.get("lat", 25.3960))
+        max_dist = int(request.args.get("max_distance", 50000)) # 50 km default
+
+        query = {
+            "coordinates": {
+                "$near": {
+                    "$geometry": {
+                        "type": "Point",
+                        "coordinates": [lon, lat]
+                    },
+                    "$maxDistance": max_dist
+                }
+            }
+        }
+
+        results = list(db.locations.find(query))
+        return jsonify({
+            "feature": "MongoDB 2dsphere Geospatial Index",
+            "query_center": [lon, lat],
+            "max_distance_meters": max_dist,
+            "locations_found": len(results),
+            "results": convert_bson(results)
+        })
+
+    except Exception:
+        app.logger.exception("Geospatial query failed")
+        return jsonify({"error": "Geospatial query failed."}), 500
+
+
+# ==================================================
+# 14. AGGREGATION PIPELINES DEMO API
+# ==================================================
+
+@app.route("/api/aggregations/run")
+def run_aggregations():
+    """
+    Executes and returns the 5 MongoDB aggregation pipelines
+    required by the project rubric.
+    """
+    try:
+        # Pipeline 1: Avg Temp & Humidity by Sensor
+        p1 = list(db.readings.aggregate([
+            {"$match": {"temperature_c": {"$ne": None}}},
+            {"$group": {
+                "_id": "$sensor_id",
+                "avg_temperature": {"$avg": "$temperature_c"},
+                "avg_humidity": {"$avg": "$humidity_percent"},
+                "total_records": {"$sum": 1}
+            }}
+        ]))
+
+        # Pipeline 2: Hourly distribution using $hour
+        p2 = list(db.readings.aggregate([
+            {"$match": {"recorded_at": {"$ne": None}}},
+            {"$group": {
+                "_id": {"$hour": "$recorded_at"},
+                "record_count": {"$sum": 1}
+            }},
+            {"$sort": {"_id": 1}}
+        ]))
+
+        # Pipeline 3: Daily Summary using $dateToString
+        p3 = list(db.readings.aggregate([
+            {"$match": {"recorded_at": {"$ne": None}, "temperature_c": {"$ne": None}}},
+            {"$group": {
+                "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$recorded_at"}},
+                "min_temp": {"$min": "$temperature_c"},
+                "max_temp": {"$max": "$temperature_c"},
+                "avg_temp": {"$avg": "$temperature_c"},
+                "count": {"$sum": 1}
+            }},
+            {"$sort": {"_id": -1}},
+            {"$limit": 7}
+        ]))
+
+        # Pipeline 4: Temperature Bucketing
+        p4 = list(db.readings.aggregate([
+            {"$match": {"temperature_c": {"$ne": None}}},
+            {"$bucket": {
+                "groupBy": "$temperature_c",
+                "boundaries": [0, 20, 30, 40, 60],
+                "default": "other",
+                "output": {"records": {"$sum": 1}}
+            }}
+        ]))
+
+        # Pipeline 5: Humidity Distribution Bucketing
+        p5 = list(db.readings.aggregate([
+            {"$match": {"humidity_percent": {"$ne": None}}},
+            {"$bucket": {
+                "groupBy": "$humidity_percent",
+                "boundaries": [0, 25, 50, 75, 101],
+                "default": "other",
+                "output": {
+                    "records": {"$sum": 1},
+                    "avg_humidity": {"$avg": "$humidity_percent"}
+                }
+            }}
+        ]))
 
         return jsonify({
-            "error": "Could not calculate sensor analytics."
-        }), 500
+            "status": "success",
+            "pipelines_executed": 5,
+            "pipeline_1_sensor_averages": convert_bson(p1),
+            "pipeline_2_hourly_distribution": convert_bson(p2),
+            "pipeline_3_daily_summary_last_7_days": convert_bson(p3),
+            "pipeline_4_temperature_buckets": convert_bson(p4),
+            "pipeline_5_humidity_buckets": convert_bson(p5)
+        })
+
+    except Exception:
+        app.logger.exception("Aggregation pipelines execution failed")
+        return jsonify({"error": "Failed to run aggregation pipelines."}), 500
 
 
-# --------------------------------------------------
+# ==================================================
 # 13. START APPLICATION
-# --------------------------------------------------
+# ==================================================
 
 if __name__ == "__main__":
-
     app.run(
-        debug=True,
         host="127.0.0.1",
-        port=5000
+        port=5000,
+        debug=False,
+        use_reloader=False
     )

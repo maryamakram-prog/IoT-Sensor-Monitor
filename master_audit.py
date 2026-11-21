@@ -4,6 +4,12 @@ from dotenv import load_dotenv
 from pymongo import MongoClient
 
 load_dotenv()
+try:
+    import dns.resolver
+    dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
+    dns.resolver.default_resolver.nameservers = ["8.8.8.8", "1.1.1.1"]
+except Exception:
+    pass
 print("\n===== SENSORSENSE REMAINING AUDIT =====")
 
 print("\n1. PROJECT FILES")

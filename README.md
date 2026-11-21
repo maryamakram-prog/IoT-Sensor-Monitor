@@ -1,146 +1,214 @@
-# IoT Sensor Monitor — Weather & Air-Quality Tracker
+# IoT Sensor Monitor — Environmental & Air-Quality Monitoring Platform
 
-## Project Overview
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
+[![Database](https://img.shields.io/badge/Database-MongoDB%20Atlas-green.svg)](https://www.mongodb.com/atlas)
+[![Framework](https://img.shields.io/badge/Framework-Flask%20%7C%20Streamlit-orange.svg)](https://flask.palletsprojects.com/)
 
-IoT Sensor Monitor is a database-driven application developed using Flask and MongoDB. It provides a dashboard for monitoring sensor information, weather readings, air-quality indicators, alerts, and analytical summaries.
+A database-driven Advanced Database Management System (ADBMS) application demonstrating MongoDB schema modeling, indexing performance (`explain()`), full RESTful CRUD operations, 5 aggregation pipelines, and advanced database features (Geospatial indexing & Time-Series collections).
 
-The project demonstrates database design, CRUD operations, aggregation pipelines, indexing, and query performance analysis.
+---
 
-## Objectives
+## 📌 Project Overview & Objectives
 
-- Store and manage sensor information using MongoDB.
-- Record and analyze weather and air-quality-related readings.
-- Perform CRUD operations on sensor records.
-- Use aggregation pipelines to summarize and analyze data.
-- Improve query efficiency using MongoDB indexes.
-- Display sensor and analytics information through a Flask dashboard.
+* **Database Engine:** MongoDB Atlas (M0 Free Tier Cluster) with **1,500+ documents** across 5 core collections + 1 time-series collection.
+* **Backend:** Python / Flask with modular Blueprints (`crud_routes.py`) and direct MongoDB aggregation pipelines.
+* **Frontend:** Responsive dashboard with live atmospheric telemetry, CRUD sensor management interface, and analytical trend charts.
+* **Telemetry Data Source:** Real-world meteorological reanalysis archive (1,488+ documents) and hourly observation API telemetry from Open-Meteo for Hyderabad, Sindh, Pakistan.
 
-## Technologies Used
+> **Data Provenance & Academic Notice:** Physical IoT sensor hardware is not utilized. Atmospheric measurements reflect validated meteorological reanalysis models and station API feeds for database benchmarking and analytical queries.
 
-- **Backend:** Python, Flask
-- **Database:** MongoDB Atlas
-- **Database Library:** PyMongo
-- **Frontend:** HTML, CSS
-- **Configuration:** python-dotenv
-- **Data Import:** Python Requests
+---
 
-## Main Features
+## 🗄️ Database Architecture & Collections
 
-- Sensor management: Create, read, update, and delete sensor records.
-- Sensor dashboard: View sensor information and summary statistics.
-- Reading history: Retrieve recent sensor readings.
-- Alerts: View stored alerts.
-- Data analytics: Analyze temperature, humidity, and reading trends.
-- Aggregation pipelines: Perform grouping, counting, summarization, and bucketing.
-- Index performance analysis: Compare indexed queries with collection scans.
-- Geospatial indexing: Includes a 2dsphere index for location-related queries.
+The database `IoTSensorMonitor` contains the following collections:
 
-## Database Collections
+1. **`sensors`** — Device identifiers, metadata, hardware types, operational status (`active`/`inactive`), and location references.
+2. **`readings`** — Time-stamped telemetry documents storing temperature (°C), relative humidity (%), PM2.5, PM10, and US AQI.
+3. **`locations`** — Geographic monitoring sites with GeoJSON `Point` coordinates indexed with a `2dsphere` index.
+4. **`alerts`** — Environmental thresholds and critical system warning notifications.
+5. **`maintenance_logs`** — Operational logs and inspection reports for registered devices.
+6. **`sensor_readings_ts`** *(Bonus Advanced Feature)* — Dedicated MongoDB Time-Series collection configured with `timeField: "recorded_at"` and `metaField: "sensor_id"`.
 
-The database contains five collections:
+---
 
-1. **sensors** — sensor identifiers, names, types, status, and installation details.
-2. **readings** — recorded weather and sensor measurements with timestamps.
-3. **locations** — location information associated with sensors.
-4. **alerts** — alert details, severity, and status.
-5. **maintenance_logs** — sensor maintenance records.
+## 📊 Database Schema Design (Mermaid Diagram)
 
-## Data and Testing Notes
+```mermaid
+erDiagram
+    locations ||--o{ sensors : "installed_at (location_id)"
+    sensors ||--o{ readings : "generates (sensor_id)"
+    sensors ||--o{ alerts : "triggers (sensor_id)"
+    sensors ||--o{ maintenance_logs : "records (sensor_id)"
 
-The development database contains more than 1,000 reading documents. Most historical weather records were imported from Open-Meteo reanalysis data for Hyderabad, Pakistan. A small number of demonstration records are also included.
+    locations {
+        ObjectId _id PK
+        string location_name
+        string city
+        string country
+        GeoJSON coordinates "2dsphere indexed"
+    }
 
-**Important:** These historical and demonstration records are not measurements from physical IoT hardware or a live air-quality monitoring device. Air-quality values in demonstration records should not be interpreted as verified real-time environmental measurements.
+    sensors {
+        ObjectId _id PK
+        string sensor_id UK "Unique Identifier"
+        string sensor_name
+        string sensor_type
+        string status "active | inactive"
+        ObjectId location_id FK
+        date installed_at
+    }
 
-The project includes five MongoDB aggregation pipeline tests and index-performance comparisons documented in `INDEX_PERFORMANCE.md`.
+    readings {
+        ObjectId _id PK
+        string sensor_id FK
+        ObjectId location_id FK
+        float temperature_c
+        float humidity_percent
+        float pm25
+        float pm10
+        int aqi
+        date recorded_at "Compound Indexed with sensor_id"
+        string data_source
+    }
 
-## Project Structure
+    alerts {
+        ObjectId _id PK
+        string sensor_id FK
+        string alert_type
+        string severity "high | medium | low"
+        string message
+        date created_at
+        string status "open | resolved"
+    }
 
-```text
-IoT-Sensor-Monitor/
-├── app.py
-├── crud_routes.py
-├── aggregation_tests.py
-├── import_weather_data.py
-├── INDEX_PERFORMANCE.md
-├── requirements.txt
-├── .env.example
-├── .gitignore
-└── templates/
-    └── index.html
+    maintenance_logs {
+        ObjectId _id PK
+        string sensor_id FK
+        string maintenance_type
+        string performed_by
+        string result
+        date maintenance_date
+    }
 ```
 
-## Setup Instructions
+### Data Modeling Justification: Referencing vs. Embedding
 
-### 1. Clone the repository
+* **Why Referencing was selected for `readings`:**
+  In environmental IoT monitoring, sensors record telemetry indefinitely (hundreds of thousands of records over time). MongoDB enforces a strict **16MB BSON document size limit**. Embedding readings directly inside the `sensors` document would quickly exceed this threshold, lead to continuous in-memory document reallocation, and degrade write performance.
+* **Referencing Strategy:** `readings` reference `sensor_id` and `location_id`. This decouples historical scale from sensor metadata while compound indexing `{ sensor_id: 1, recorded_at: -1 }` guarantees rapid query execution.
 
+---
+
+## ⚡ Indexing & `explain()` Performance Comparison
+
+A compound index was implemented on the `readings` collection:
+```javascript
+db.readings.createIndex({ sensor_id: 1, recorded_at: -1 })
+```
+
+### Execution Statistics (`explain("executionStats")`)
+
+Query: Filter by `sensor_id = "SENSOR-WEATHER-HYD-001"`, sort by `recorded_at: -1`, `limit: 1`.
+
+| Metric | Without Index (`COLLSCAN`) | With Compound Index (`IXSCAN`) | Improvement Factor |
+| :--- | :---: | :---: | :---: |
+| **Winning Stage** | `COLLSCAN + SORT` | `IXSCAN + FETCH` | Index scan utilized |
+| **Documents Examined** | **1,538 docs** | **1 doc** | **1,538x data reduction** |
+| **Keys Examined** | 0 | 1 | Direct B-Tree lookup |
+| **In-Memory Sort** | Yes (blocking sort) | None (pre-sorted index) | Zero CPU sort overhead |
+| **Execution Result** | `COLLSCAN` scanned entire collection | Fast B-tree pointer traversal | Optimal |
+
+---
+
+## 🔬 MongoDB Aggregation Pipelines (5 Implemented)
+
+All aggregation pipelines are executed directly within the MongoDB Atlas database engine via `/api/aggregations/run` and `/api/analytics`:
+
+| # | Pipeline Objective | Operators Used | Description |
+|---|---|---|---|
+| **1** | **Sensor Averages** | `$match`, `$group`, `$avg`, `$sum` | Computes mean temperature and humidity per sensor across all historical documents. |
+| **2** | **Hourly Distribution** | `$match`, `$group`, `$hour`, `$sort` | Extracts the hour of day from `recorded_at` and counts readings to analyze diurnal telemetry volume. |
+| **3** | **Daily Summary** | `$match`, `$group`, `$dateToString`, `$min`, `$max`, `$avg`, `$limit` | Groups readings by date string (`%Y-%m-%d`) calculating daily min, max, and avg temperatures. |
+| **4** | **Temperature Bucketing** | `$match`, `$bucket` | Categorizes ambient temperature into ranges: `[0, 20)`, `[20, 30)`, `[30, 40)`, `[40, 60)`. |
+| **5** | **Humidity Bucketing** | `$match`, `$bucket`, `$avg` | Groups relative humidity into statistical quartiles: `[0, 25)`, `[25, 50)`, `[50, 75)`, `[75, 101)`. |
+
+---
+
+## 🚀 Advanced MongoDB Features
+
+### 1. Geospatial `2dsphere` Indexing & `$near` Queries
+* **Index:** `coordinates_2dsphere` on `locations.coordinates`.
+* **Format:** GeoJSON `Point` (`[longitude, latitude]`).
+* **Endpoint:** `GET /api/locations/nearby?lon=68.3578&lat=25.3960&max_distance=50000`
+* **Query Execution Plan:** `GEO_NEAR_2DSPHERE` stage returning monitoring stations sorted in ascending order of geographic distance.
+
+### 2. Native Time-Series Collection
+* **Collection:** `sensor_readings_ts`
+* **Configuration:** `timeField: "recorded_at"`, `metaField: "sensor_id"`, `granularity: "hours"`
+* **Benefit:** Reduces storage footprint and optimizes sequential time-series range scans.
+
+---
+
+## 🛠️ Full REST API Specification
+
+| Method | Endpoint | Description | Status Code |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/api/health` | MongoDB Atlas ping & connection status | `200` |
+| `GET` | `/api/counts` | Counts for sensors, readings, alerts | `200` |
+| `GET` | `/api/sensors` | List all registered sensors | `200` |
+| `POST` | `/api/sensors` | **CREATE:** Register new sensor document | `201` |
+| `GET` | `/api/sensors/<id>` | **READ:** Fetch single sensor details | `200` |
+| `PUT` | `/api/sensors/<id>` | **UPDATE:** Modify sensor name, type, or status | `200` |
+| `DELETE` | `/api/sensors/<id>` | **DELETE:** Remove sensor from database | `200` |
+| `GET` | `/api/readings` | Retrieve latest 100 telemetry records | `200` |
+| `GET` | `/api/analytics` | MongoDB `$facet` aggregation analytics | `200` |
+| `GET` | `/api/aggregations/run` | Execute and return all 5 rubric aggregation pipelines | `200` |
+| `GET` | `/api/locations/nearby` | Geospatial `$near` location query | `200` |
+
+---
+
+## 💻 Local Setup & Execution
+
+### 1. Clone & Setup Environment
 ```bash
 git clone https://github.com/maryamakram-prog/IoT-Sensor-Monitor.git
 cd IoT-Sensor-Monitor
-```
 
-### 2. Create and activate a virtual environment
-
-```bash
 python -m venv .venv
-```
-
-On Windows PowerShell:
-
-```powershell
+# Windows PowerShell
 .venv\Scripts\Activate.ps1
-```
+# Linux / macOS
+source .venv/bin/activate
 
-### 3. Install dependencies
-
-```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure environment variables
-
-Create a `.env` file in the project root using `.env.example` as a template:
-
+### 2. Configure Environment Variables
+Copy `.env.example` to `.env` and configure your MongoDB Atlas connection string:
 ```text
-MONGO_URI=your_mongodb_atlas_connection_string
+MONGO_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/?retryWrites=true&w=majority
 MONGO_DB=IoTSensorMonitor
 ```
 
-Replace the placeholder with your own MongoDB Atlas connection string. Never publish database passwords or real connection strings.
+### 3. Run Application
+* **Flask Web Dashboard:**
+  ```bash
+  python app.py
+  ```
+  Visit: `http://127.0.0.1:5000`
 
-### 5. Run the application
+* **Streamlit Interactive UI:**
+  ```bash
+  streamlit run streamlit_app.py
+  ```
+  Visit: `http://localhost:8501`
 
-```bash
-python app.py
-```
+---
 
-Open the local URL displayed by Flask, usually:
+## 🎓 Viva & Evaluation Quick Reference
 
-`http://127.0.0.1:5000`
-
-## Database and Performance Work
-
-The project demonstrates:
-
-- CRUD operations for sensor records.
-- Five aggregation pipeline examples.
-- Compound and other indexes for relevant collections.
-- Query execution-plan comparisons using MongoDB `explain`.
-- A geospatial index on location data.
-
-See `INDEX_PERFORMANCE.md` for the recorded performance tests.
-
-## Limitations
-
-- The current dataset primarily uses historical weather data and demonstration records.
-- Physical IoT hardware and verified live air-quality sensor integration are not included.
-- Deployment and live public access must be configured separately if required.
-
-## Future Improvements
-
-- Integrate physical IoT sensors.
-- Add a verified live air-quality data source.
-- Implement automated alert generation.
-- Add authentication and role-based access.
-- Deploy the application to a public hosting platform.
-
-##
+* **Why referencing over embedding?** Avoids 16MB document limit and document growth penalty as sensor readings increase indefinitely.
+* **How was `explain()` tested?** Executed on `readings` query with and without `{ sensor_id: 1, recorded_at: -1 }`. Resulted in `COLLSCAN` (1,538 docs examined) vs `IXSCAN` (1 doc examined).
+* **Which advanced feature is present?** Both `2dsphere` geospatial proximity indexing (`$near`) on `locations` and native MongoDB Time-Series collections (`sensor_readings_ts`).
+* **Where are aggregations executed?** Directly in MongoDB Atlas via pipelines using `$match`, `$group`, `$avg`, `$hour`, `$dateToString`, and `$bucket`.

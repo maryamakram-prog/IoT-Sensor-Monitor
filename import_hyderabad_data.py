@@ -10,6 +10,14 @@ from pymongo import MongoClient
 
 load_dotenv()
 
+# Configure DNS resolver to avoid Windows SRV query SERVFAIL issues
+try:
+    import dns.resolver
+    dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
+    dns.resolver.default_resolver.nameservers = ["8.8.8.8", "1.1.1.1"]
+except Exception:
+    pass
+
 # Hyderabad, Sindh, Pakistan
 LATITUDE = 25.3960
 LONGITUDE = 68.3578
@@ -198,6 +206,8 @@ def main():
         ):
             continue
 
+        dt_record = datetime.fromisoformat(timestamp)
+
         reading = {
             "sensor_id": SENSOR_ID,
             "location_id": location_id,
@@ -206,7 +216,7 @@ def main():
             "pm25": pm25,
             "pm10": pm10,
             "aqi": aqi,
-            "recorded_at": timestamp,
+            "recorded_at": dt_record,
             "data_source": "open-meteo-api",
             "location_name": "Hyderabad, Sindh, Pakistan"
         }
@@ -215,7 +225,7 @@ def main():
         db.readings.update_one(
             {
                 "sensor_id": SENSOR_ID,
-                "recorded_at": timestamp
+                "recorded_at": dt_record
             },
             {"$set": reading},
             upsert=True
